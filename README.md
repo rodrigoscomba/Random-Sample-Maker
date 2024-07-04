@@ -60,4 +60,4 @@ Users can download RSM as a .py file from this GitHub repository.
 The program can be run on any terminal using the following command inside the folder where the file is located.
 
 ```bash
-python random_sample_maker.py
+python randomsamplemaker.py
