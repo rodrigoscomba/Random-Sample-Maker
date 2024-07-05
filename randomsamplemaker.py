@@ -2,10 +2,11 @@ import os
 import random
 import shutil
 from PIL import Image
+import imagehash
 import argparse
 import openpyxl
 import tkinter as tk
-import tkinter as tk
+from tkinter import ttk
 from tkinter import filedialog, messagebox, Label, Entry, Button, Checkbutton, StringVar, BooleanVar, Radiobutton
 import threading
 
@@ -18,14 +19,10 @@ def main_window(parent=None):
         window = tk.Toplevel(parent)
         window.title("Random Sample Maker - Child Window")
 
-    # ... (rest of your existing main_window code, but use 'window' instead of 'tk.Tk()')
-
-    # if parent is None:  # Only call mainloop if this is the main application window
-    #     window.mainloop()
-    global start_button
+    global start_button, progress_bar
     
-    window.geometry("530x380")  # Adjusted window size
-    
+    window.geometry("530x400")  # Adjusted window size
+    print("START\n")
     main_frame = tk.Frame(window)
     main_frame.pack(padx=5, pady=5)
     main_frame.grid_columnconfigure(1, weight=1)
@@ -58,11 +55,11 @@ def main_window(parent=None):
     Checkbutton(main_frame, text="", variable=delete_var).grid(row=row, column=1, sticky='w')
     row += 1
     
-    Label(main_frame, text="Keep existing images in destination directory:", width=widget_width, anchor='w').grid(row=row, column=0, sticky='w', pady=(widget_vertical_pad, 0))
+    Label(main_frame, text="Keep existing images in destination folder:", width=widget_width, anchor='w').grid(row=row, column=0, sticky='w', pady=(widget_vertical_pad, 0))
     Checkbutton(main_frame, text="", variable=keep_var).grid(row=row, column=1, sticky='w')
     row += 1
     
-    Label(main_frame, text="Ignore directory structure in destination:", width=widget_width, anchor='w').grid(row=row, column=0, sticky='w', pady=(widget_vertical_pad, 0))
+    Label(main_frame, text="Ignore directory structure in folder:", width=widget_width, anchor='w').grid(row=row, column=0, sticky='w', pady=(widget_vertical_pad, 0))
     Checkbutton(main_frame, text="", variable=ignore_folder_structure_var).grid(row=row, column=1, sticky='w')
     row += 1
     
@@ -74,11 +71,11 @@ def main_window(parent=None):
     formats_frame = tk.Frame(main_frame)
     formats_frame.grid(row=row, column=1, sticky='w')
 
-    Radiobutton(formats_frame, text="PNG", variable=output_format_var, value='PNG').pack(side='left')
-    Radiobutton(formats_frame, text="JPEG", variable=output_format_var, value='JPEG').pack(side='left')
-    Radiobutton(formats_frame, text="BMP", variable=output_format_var, value='BMP').pack(side='left')
-    Radiobutton(formats_frame, text="GIF", variable=output_format_var, value='GIF').pack(side='left')
-    Radiobutton(formats_frame, text="TIFF", variable=output_format_var, value='TIFF').pack(side='left')
+    Radiobutton(formats_frame, text="PNG", variable=output_format_var, value='png').pack(side='left')
+    Radiobutton(formats_frame, text="JPEG", variable=output_format_var, value='jpeg').pack(side='left')
+    Radiobutton(formats_frame, text="BMP", variable=output_format_var, value='bmp').pack(side='left')
+    Radiobutton(formats_frame, text="GIF", variable=output_format_var, value='gif').pack(side='left')
+    Radiobutton(formats_frame, text="TIFF", variable=output_format_var, value='tiff').pack(side='left')
     row += 1
 
     Label(main_frame, text="Image Size (WIDTHxHEIGHT):", width=widget_width, anchor='w').grid(row=row, column=0, sticky='w', pady=(widget_vertical_pad, 0))
@@ -102,11 +99,11 @@ def main_window(parent=None):
     root_dir_label = Label(main_frame, text="", width=widget_width, anchor='w')
     dest_dir_label = Label(main_frame, text="", width=widget_width, anchor='w')
 
-    Button(main_frame, text="Select Root Directory", command=lambda: choose_directory(root_dir_var, root_dir_label), width=widget_width).grid(row=row, column=0, columnspan=2, pady=(widget_vertical_pad, 5), sticky='ew')
+    Button(main_frame, text="Select Root Folder", command=lambda: choose_directory(root_dir_var, root_dir_label), width=widget_width).grid(row=row, column=0, columnspan=2, pady=(widget_vertical_pad, 5), sticky='ew')
     root_dir_label.grid(row=row+1, column=0, columnspan=2, sticky='ew')
     row += 2
 
-    Button(main_frame, text="Select Destination Directory", command=lambda: choose_directory(dest_dir_var, dest_dir_label), width=widget_width).grid(row=row, column=0, columnspan=2, pady=(widget_vertical_pad, 5), sticky='ew')
+    Button(main_frame, text="Select Destination Folder", command=lambda: choose_directory(dest_dir_var, dest_dir_label), width=widget_width).grid(row=row, column=0, columnspan=2, pady=(widget_vertical_pad, 5), sticky='ew')
     dest_dir_label.grid(row=row+1, column=0, columnspan=2, sticky='ew')
     row += 2
 
@@ -119,12 +116,16 @@ def main_window(parent=None):
     start_button = Button(main_frame, text="Make Random Sample", command=start_processing, width=widget_width)
     start_button.grid(row=row, column=0, columnspan=2, pady=(10, 0), sticky='ew')
 
+    # Add progress bar
+    progress_bar = ttk.Progressbar(main_frame, orient="horizontal", length=200, mode="determinate")
+    progress_bar.grid(row=row+1, column=0, columnspan=2, pady=(10, 0), sticky='ew')
+    
     window.mainloop()
 
 
 def validate_args(args):
     """ Validate the input arguments. """
-    # Example validation conditions
+
     if not os.path.isdir(args['rootdirectory']):
         messagebox.showerror("Error", "Invalid root directory.")
         return False
@@ -189,6 +190,7 @@ def start_processing():
                 messagebox.showerror("Error", str(e))
             finally:
                 start_button.config(text="Make Random Sample", state="normal") 
+                progress_bar['value'] = 0
         else:
             start_button.config(text="Make Random Sample", state="normal")
     processing_thread = threading.Thread(target=threaded_processing)
@@ -266,33 +268,6 @@ def export_to_xlsx(image_counts, filename):
 
     workbook.save(filename)
 
-def is_duplicate_in_folder(image_path, folder):
-    """
-    Check if the given image is a duplicate of any image in the specified folder.
-    """
-    for file in os.listdir(folder):
-        file_path = os.path.join(folder, file)
-        if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
-            if are_images_duplicates(image_path, file_path):
-                return file_path
-    return None
-
-def are_images_duplicates(img_path1, img_path2):
-    """
-    Compare two images and return True if they are duplicates.
-    """
-    with Image.open(img_path1) as img1, Image.open(img_path2) as img2:
-        if img1.size != img2.size:
-            return False
-        pixels1 = list(img1.getdata())
-        pixels2 = list(img2.getdata())
-        return pixels1 == pixels2
-
-def delete_duplicate(img_path):
-    """
-    Delete the image at the specified path.
-    """
-    os.remove(img_path)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Copy and resize images.')
@@ -350,11 +325,6 @@ def resize_and_crop_image(image_path, dest_path, output_size=(96, 96), output_fo
 
         img_resized.save(dest_path, format=output_format.upper())
 
-def rename_image(folder, filename, file_count):
-    new_filename = f"{file_count}.png"
-    os.rename(os.path.join(folder, filename), os.path.join(folder, new_filename))
-    #print(f"Renamed '{filename}' to '{new_filename}' in '{folder}'.")
-
 def dorandomsamplemaker(args):
     output_size = tuple(map(int, args['size'].split('x')))
     root_directory = args['rootdirectory']
@@ -369,11 +339,14 @@ def dorandomsamplemaker(args):
         clear_destination_folder(dest_directory, args['keep'])
     
     file_count = 1
+    
+    total_files = sum([len(files) for _, _, files in os.walk(root_directory)])
+    processed_files = 0
 
     for root, dirs, files in os.walk(root_directory):
         rel_path = os.path.relpath(root, root_directory)
         dest_path = dest_directory if args['ignorefolderstructure'] else os.path.join(dest_directory, rel_path)
-
+        folder_hierarchy = rel_path.split(os.sep) if rel_path != "." else []
         os.makedirs(dest_path, exist_ok=True)
 
         if args['keep']:
@@ -381,23 +354,80 @@ def dorandomsamplemaker(args):
             file_count = count_files_in_folder(dest_path) + 1
 
         # Call copy_random_images and update the file_count
-        file_count = copy_random_images(root, dest_path, number_samples, args['keep'], output_size, file_count, args['delete'], args['makeduplicates'], args['outputformat'])
+        file_count = copy_random_images(root, dest_path, number_samples, args['keep'], output_size, file_count, args['delete'], args['makeduplicates'], args['outputformat'], folder_hierarchy)
 
         # If we're not ignoring the folder structure, reset file count to what's in the folder if 'keep' is True, or to 1 if 'keep' is False.
         if not args['ignorefolderstructure']:
             file_count = count_files_in_folder(dest_path) + 1 if args['keep'] else 1
 
+        # Update processed files count and progress bar
+        processed_files += len(files)
+        progress = (processed_files / total_files) * 100
+        progress_bar['value'] = progress
+        
     if args['output']:
         export_folder_hierarchy(dest_directory, args['output'])
 
-def copy_random_images(source_folder, dest_folder, number_of_images, keep_images, output_size, file_count, delete_original, make_duplicates, output_image_type):
+def generate_image_name(file_count, folder_hierarchy, output_format):
+    """
+    Generate a new image name based on the file count and folder hierarchy.
+    
+    :param file_count: The current count of files to generate a unique name.
+    :param folder_hierarchy: A list of folder names from the root to the current folder.
+    :return: A string representing the new image name.
+    """
+    hierarchy_string = "_".join(folder_hierarchy)
+    return f"{file_count:04d}_{hierarchy_string}.{output_format}"
+
+def are_images_duplicates(img_path1, img_path2, hash_func=imagehash.phash, hash_size=8):
+    """
+    Compare two images and return True if they are duplicates using perceptual hashing.
+    
+    :param img_path1: Path to the first image.
+    :param img_path2: Path to the second image.
+    :param hash_func: Hash function to use for image comparison (default: phash).
+    :param hash_size: Hash size for image comparison (default: 8).
+    :return: True if images are duplicates, otherwise False.
+    """
+    hash1 = hash_func(Image.open(img_path1), hash_size)
+    hash2 = hash_func(Image.open(img_path2), hash_size)
+    return hash1 == hash2
+
+def remove_duplicates_from_list(source_folder, image_list, hash_func=imagehash.phash, hash_size=8):
+    """
+    Remove duplicate images from the given list of image paths using perceptual hashing.
+    """
+    unique_images = []
+    hashes = set()
+
+    for image_path in image_list:
+        source_path = os.path.join(source_folder, image_path)
+        try:
+            with Image.open(source_path) as img:
+                img = img.convert("RGB")
+                image_hash = hash_func(img, hash_size)
+                
+                if image_hash not in hashes:
+                    hashes.add(image_hash)
+                    unique_images.append(image_path)
+                else:
+                    print(f"Duplicate found: {image_path}")
+        except Exception as e:
+            print(f"Error processing image {image_path}: {e}")
+            continue
+
+    return unique_images
+
+def copy_random_images(source_folder, dest_folder, number_of_images, keep_images, output_size, file_count, delete_original, make_duplicates, output_image_type, folder_hierarchy):
     source_folder = r"{}".format(source_folder)
     dest_folder = r"{}".format(dest_folder)
 
     if not os.path.exists(source_folder):
         return file_count
 
-    image_files = [file for file in os.listdir(source_folder) if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp'))]
+    original_image_files = [file for file in os.listdir(source_folder) if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp'))]
+    
+    image_files = remove_duplicates_from_list(source_folder, original_image_files)
     
     selected_images = []
     
@@ -422,7 +452,7 @@ def copy_random_images(source_folder, dest_folder, number_of_images, keep_images
     # Process and copy the selected images.
     for image in selected_images:
         source_path = os.path.join(source_folder, image)
-        dest_filename = f"{file_count:04d}.png"
+        dest_filename = generate_image_name(file_count, folder_hierarchy, output_image_type)
         dest_path = os.path.join(dest_folder, dest_filename)
 
         if not keep_images or not os.path.exists(dest_path):
